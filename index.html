@@ -1,0 +1,363 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#101b32">
+<title>SMART AI</title><style>
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #101b32;
+  color: #ffffff;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  flex-shrink: 0;
+  background: #1769e0;
+  padding: 10px 5px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.tagline {
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 11px;
+  padding: 7px 3px;
+  color: #c8d9f5;
+}
+
+#chat {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 7px;
+}
+
+.message {
+  padding: 8px;
+  margin: 7px 0;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.user {
+  background: #1769e0;
+  margin-left: 12px;
+}
+
+.ai {
+  background: #243651;
+  margin-right: 8px;
+}
+
+#status {
+  flex-shrink: 0;
+  min-height: 22px;
+  text-align: center;
+  color: #80d8ff;
+  font-size: 11px;
+  padding: 4px;
+}
+
+.controls {
+  flex-shrink: 0;
+  padding: 6px;
+  background: #182740;
+}
+
+#question {
+  width: 100%;
+  height: 38px;
+  padding: 7px;
+  font-size: 14px;
+  border: 1px solid #7892b6;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #111111;
+}
+
+button {
+  width: 100%;
+  min-height: 36px;
+  margin-top: 5px;
+  padding: 7px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #ffffff;
+  background: #1769e0;
+  border: 0;
+  border-radius: 5px;
+}
+
+button:focus, input:focus {
+  outline: 2px solid #ffd54f;
+}
+
+#clearButton {
+  background: #354761;
+}
+
+.footer {
+  flex-shrink: 0;
+  padding: 5px;
+  text-align: center;
+  color: #b9c9df;
+  background: #101b32;
+  font-size: 10px;
+}
+</style></head><body><div class="header">SMART AI</div><div class="tagline">
+  Your Multilingual AI Assistant
+</div><div id="chat" role="log" aria-live="polite">
+  <div class="message ai">Welcome to SMART AI!Ask me a question in your language.
+
+I am designed for English, Urdu, Roman Urdu, Saraiki, Pashto and many other languages.
+
+Type your question below to get started.</div>
+
+</div><div id="status" aria-live="polite">Ready</div><div class="controls">
+  <input
+    id="question"
+    type="text"
+    placeholder="Type your question..."
+    autocomplete="off"
+    aria-label="Your question"
+  ><button id="sendButton" type="button">SEND</button>
+<button id="clearButton" type="button">CLEAR CHAT</button>
+
+</div><div class="footer">
+  SMART AI | KaiOS Assistant
+</div><script>
+(function () {
+  "use strict";
+
+  /*
+    SECURITY:
+    Never put your Gemini API key here.
+
+    After creating a secure backend, replace the
+    empty BACKEND_URL with your backend endpoint.
+  */
+
+  var BACKEND_URL = "";
+
+  var chat = document.getElementById("chat");
+  var input = document.getElementById("question");
+  var sendButton = document.getElementById("sendButton");
+  var clearButton = document.getElementById("clearButton");
+  var status = document.getElementById("status");
+
+  var busy = false;
+  var history = [];
+
+  try {
+    var saved = localStorage.getItem("smart_ai_history");
+
+    if (saved) {
+      history = JSON.parse(saved);
+
+      if (!history || typeof history.length !== "number") {
+        history = [];
+      }
+
+      if (history.length > 20) {
+        history = history.slice(-20);
+      }
+    }
+  } catch (e) {
+    history = [];
+  }
+
+  function saveHistory() {
+    try {
+      localStorage.setItem(
+        "smart_ai_history",
+        JSON.stringify(history.slice(-20))
+      );
+    } catch (e) {
+      status.textContent = "Chat history unavailable";
+    }
+  }
+
+  function addMessage(text, role, save) {
+    var div = document.createElement("div");
+
+    div.className = "message " + role;
+    div.textContent = text;
+
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+
+    if (save !== false) {
+      history.push({
+        role: role,
+        text: text
+      });
+
+      if (history.length > 20) {
+        history = history.slice(-20);
+      }
+
+      saveHistory();
+    }
+  }
+
+  function renderHistory() {
+    chat.innerHTML = "";
+
+    if (history.length === 0) {
+      addMessage(
+        "Welcome to SMART AI! Type a question in your language.",
+        "ai",
+        false
+      );
+      return;
+    }
+
+    for (var i = 0; i < history.length; i++) {
+      var div = document.createElement("div");
+
+      div.className = "message " +
+        (history[i].role === "user" ? "user" : "ai");
+
+      div.textContent = history[i].text;
+      chat.appendChild(div);
+    }
+
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function askAI() {
+    var question = input.value.replace(/^\s+|\s+$/g, "");
+
+    if (!question || busy) {
+      return;
+    }
+
+    addMessage(question, "user");
+    input.value = "";
+
+    if (!BACKEND_URL) {
+      addMessage(
+        "Your question has been added to the chat. The AI service is not connected yet. Please complete the secure backend setup to receive real AI answers.",
+        "ai"
+      );
+
+      status.textContent = "AI setup required";
+      input.focus();
+      return;
+    }
+
+    busy = true;
+    sendButton.disabled = true;
+    status.textContent = "SMART AI is thinking...";
+
+    var xhr = new XMLHttpRequest();
+
+    xhr.open("POST", BACKEND_URL, true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4) {
+        return;
+      }
+
+      busy = false;
+      sendButton.disabled = false;
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          var result = JSON.parse(xhr.responseText);
+
+          if (result && result.reply) {
+            addMessage(String(result.reply), "ai");
+            status.textContent = "Ready";
+          } else {
+            addMessage("No answer received. Please try again.", "ai");
+            status.textContent = "No answer";
+          }
+        } catch (e) {
+          addMessage("Unable to read the AI response.", "ai");
+          status.textContent = "Response error";
+        }
+      } else {
+        addMessage(
+          "The AI service is unavailable. Please try again later.",
+          "ai"
+        );
+
+        status.textContent = "Connection error";
+      }
+
+      input.focus();
+    };
+
+    xhr.onerror = function () {
+      busy = false;
+      sendButton.disabled = false;
+
+      status.textContent = "Check your internet connection";
+
+      addMessage(
+        "Connection failed. Please check your internet and try again.",
+        "ai"
+      );
+    };
+
+    xhr.send(JSON.stringify({
+      message: question,
+      language: "auto"
+    }));
+  }
+
+  sendButton.onclick = askAI;
+
+  input.onkeydown = function (event) {
+    event = event || window.event;
+
+    if (event.key === "Enter" || event.keyCode === 13) {
+      if (event.preventDefault) {
+        event.preventDefault();
+      }
+
+      askAI();
+      return false;
+    }
+  };
+
+  clearButton.onclick = function () {
+    if (busy) {
+      return;
+    }
+
+    history = [];
+    saveHistory();
+    renderHistory();
+
+    status.textContent = "Chat cleared";
+    input.focus();
+  };
+
+  renderHistory();
+
+  input.focus();
+})();
+</script></body>
+  </html>
